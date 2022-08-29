@@ -16,8 +16,8 @@ services:
     image: postgres
     environment:
       POSTGRES_PASSWORD: uc4Utauu
-      POSTGRES_USER: fantasteeringwheel
-      POSTGRES_DB: fantasteeringwheel
+      POSTGRES_USER: test
+      POSTGRES_DB: test
     ports:
       - 5432:5432
     volumes:

@@ -67,8 +67,13 @@ func (u *User) ValidatePassword(passwd string) bool {
 }
 
 func main() {
-	dsn := "host=db user=fantasteeringwheel " +
-		"password=uc4Utauu dbname=fantasteeringwheel " +
+
+	/*
+	* gin.SetMode(gin.ReleaseMode) <- per passare in production
+	*
+	 */
+	dsn := "host=db user=test " +
+		"password=uc4Utauu dbname=test " +
 		"port=5432 sslmode=disable TimeZone=Europe/Rome"
 	database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	database.AutoMigrate(&Message{})
