@@ -1,0 +1,37 @@
+version: "3.1"
+
+services:
+  app:
+    container_name: TESTGOENGINE
+    build: ./_example/basic
+    environment:
+      Port: 3010
+    ports:
+      - 3010:3010
+    depends_on:
+      - db
+
+  db:
+    container_name: TESTGODB
+    image: postgres
+    environment:
+      POSTGRES_PASSWORD: uc4Utauu
+      POSTGRES_USER: fantasteeringwheel
+      POSTGRES_DB: fantasteeringwheel
+    ports:
+      - 5432:5432
+    volumes:
+      - ./data/pgdata:/var/lib/postgresql/data 
+  # db:
+  #   image: mongo
+  #   container_name: FantaSW_mongodb
+  #   environment:
+  #     PUID: 1000
+  #     PGID: 1000
+  #     MONGO_INITDB_DATABASE: garadb
+  #   volumes:
+  #     - ./data/mongodata:/data/db
+  #   ports:
+  #     - 27017:27017
+  #   restart: unless-stopped      
+    

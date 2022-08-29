@@ -1,0 +1,20 @@
+FROM golang:latest
+
+# Set the Current Working Directory inside the container
+WORKDIR /_example/basic
+
+# Copy everything from the current directory to the PWD (Present Working Directory) inside the container
+COPY . ./
+
+# Download all the dependencies
+RUN go get gorm.io/gorm
+RUN go get gorm.io/driver/postgres
+# RUN go get -d -v ./...
+# Install the package
+#RUN go install -v ./...
+
+# This container exposes port 8080 to the outside world
+EXPOSE 3010
+
+# Run the executable
+CMD ["go", "run", "main.go"]
