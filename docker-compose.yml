@@ -3,7 +3,7 @@ version: "3.1"
 services:
   app:
     container_name: TESTGOENGINE
-    build: ./_example/basic
+    build: ./engine
     environment:
       Port: 3010
     ports:
