@@ -29,18 +29,19 @@ func helloHandler(c *gin.Context) {
 	user, _ := c.Get(identityKey)
 	c.JSON(200, gin.H{
 		"userID":   claims[identityKey],
-		"userName": user.(*User).UserName,
+		"userName": user.(*User).Username,
 		"text":     "Hello World.",
 	})
 }
 
 // User demo
 type User struct {
-	UserName  string
+	Username  string
 	FirstName string
 	LastName  string
 	Passwd    string
 	Salt      string
+	ID        uint
 }
 
 type Message struct {
@@ -48,6 +49,7 @@ type Message struct {
 	Email   string
 	Object  string
 	Message string
+	ID      uint
 }
 
 func hashPassword(passwd, salt string) string {
@@ -76,7 +78,7 @@ func main() {
 		"password=uc4Utauu dbname=test " +
 		"port=5432 sslmode=disable TimeZone=Europe/Rome"
 	database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	database.AutoMigrate(&Message{})
+	database.AutoMigrate(&Message{}, &User{})
 
 	fmt.Println("Connected to database.")
 
@@ -97,7 +99,7 @@ func main() {
 		PayloadFunc: func(data interface{}) jwt.MapClaims {
 			if v, ok := data.(*User); ok {
 				return jwt.MapClaims{
-					identityKey: v.UserName,
+					identityKey: v.Username,
 				}
 			}
 			return jwt.MapClaims{}
@@ -105,29 +107,27 @@ func main() {
 		IdentityHandler: func(c *gin.Context) interface{} {
 			claims := jwt.ExtractClaims(c)
 			return &User{
-				UserName: claims[identityKey].(string),
+				Username: claims[identityKey].(string),
 			}
 		},
 		Authenticator: func(c *gin.Context) (interface{}, error) {
-			var loginVals login
-			if err := c.ShouldBind(&loginVals); err != nil {
+			//questa è una funzione di login, tutta la logica di login va qua dentro
+			//da sostituire "User" con "Login" perche è piu sicuro
+			var loginVals User
+			// var outputUser []User
+			if err := c.ShouldBindJSON(&loginVals); err != nil {
 				return "", jwt.ErrMissingLoginValues
 			}
-			userID := loginVals.Username
-			password := loginVals.Password
+			// userID := loginVals.Username
+			// password := loginVals.Password
 
-			if (userID == "admin" && password == "admin") || (userID == "test" && password == "test") {
-				return &User{
-					UserName:  userID,
-					LastName:  "Bo-Yi",
-					FirstName: "Wu",
-				}, nil
-			}
-
-			return nil, jwt.ErrFailedAuthentication
+			//da aggiungere validazione nel caso la query non trovi l'utente
+			// database.Where(&loginVals).Find(&outputUser)
+			return database.First(&loginVals), nil
+			// return nil, jwt.ErrFailedAuthentication
 		},
 		Authorizator: func(data interface{}, c *gin.Context) bool {
-			if v, ok := data.(*User); ok && v.UserName == "admin" {
+			if v, ok := data.(*User); ok && v.Username == "admin" {
 				return true
 			}
 
