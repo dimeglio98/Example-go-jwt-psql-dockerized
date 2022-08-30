@@ -35,6 +35,35 @@ func helloHandler(c *gin.Context) {
 	})
 }
 
+var GlobalDB *gorm.DB
+
+func createMessage(c *gin.Context) {
+	fmt.Println("CREATEMESSAGE")
+	var inputMessage Message
+
+	if err := c.ShouldBindJSON(&inputMessage); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	GlobalDB.Create(&inputMessage)
+	c.JSON(http.StatusCreated, inputMessage)
+}
+
+func readMessage(c *gin.Context) {
+	fmt.Println("READMESSAGE")
+
+	var inputMessage Message
+	var outputMessage []Message
+	if err := c.ShouldBindJSON(&inputMessage); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	GlobalDB.Where(&inputMessage).Find(&outputMessage)
+	c.JSON(http.StatusCreated, outputMessage)
+}
+
 // User demo
 type User struct {
 	Username  string
@@ -79,6 +108,7 @@ func main() {
 		"password=uc4Utauu dbname=test " +
 		"port=5432 sslmode=disable TimeZone=Europe/Rome"
 	database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	GlobalDB = database
 	database.AutoMigrate(&Message{}, &User{})
 
 	fmt.Println("Connected to database.")
@@ -108,6 +138,7 @@ func main() {
 			return jwt.MapClaims{}
 		},
 		IdentityHandler: func(c *gin.Context) interface{} {
+			//questa funzione penso che restituisca qualcosa nel token, non ho ben capito
 			fmt.Println("IDENTITYHANDLER")
 			claims := jwt.ExtractClaims(c)
 			fmt.Println(claims)
@@ -124,38 +155,37 @@ func main() {
 			if err := c.ShouldBindJSON(&loginVals); err != nil {
 				return "", jwt.ErrMissingLoginValues
 			}
-			// userID := loginVals.Username
-			// password := loginVals.Password
 
 			//da aggiungere validazione nel caso la query non trovi l'utente
-			database.Where(&loginVals).Find(&outputUser).Limit(1)
-			// fmt.Println(outputUser)
+			if result := database.Where(&loginVals).First(&outputUser); result.Error != nil {
+				// error handling...
+				return nil, jwt.ErrFailedAuthentication
+			}
+
 			return &User{
 				Username:  outputUser.Username,
 				LastName:  outputUser.LastName,
 				FirstName: outputUser.FirstName,
 				ID:        outputUser.ID,
 			}, nil
-			// return nil, jwt.ErrFailedAuthentication
+
 		},
 		Authorizator: func(data interface{}, c *gin.Context) bool {
+			//questa funzione viene chiamata quando viene fatta una richiesta di una risorsa protetta
+			//deve controllare se l'elemento (l'id o lo username) passato nel token è corretto
 			fmt.Println("AUTHORIZATOR")
 			var loginVals User
-			v := data.(*User)
-			fmt.Println(v, data)
-			//questa funzione deve controllare se l'elemento (l'id o lo username) passato nel token è corretto
+			v := data.(*User) //utente passato nel token?
+
 			result := database.Where("ID = ?", v.ID).First(&loginVals)
 			if result.Error == nil {
 				return true
 			}
-			// database.Where(&loginVals).Find(&outputUser).Limit(1)
-			// if v, ok := data.(*User); ok && v.Username == "admin" {
-			// 	return true
-			// }
 
 			return false
 		},
 		Unauthorized: func(c *gin.Context, code int, message string) {
+			//funzione che restituisce il messaggio nel caso le credenziali siano errate (token scaduto, pwd errata, ecc)
 			c.JSON(code, gin.H{
 				"code":    code,
 				"message": message,
@@ -206,6 +236,11 @@ func main() {
 	auth.Use(authMiddleware.MiddlewareFunc())
 	{
 		auth.GET("/hello", helloHandler)
+		post := auth.Group("/message")
+		{
+			post.POST("/create", createMessage)
+			post.GET("/read", readMessage)
+		}
 	}
 
 	if err := http.ListenAndServe(":"+port, r); err != nil {
