@@ -22,9 +22,10 @@ type login struct {
 	Password string `form:"password" json:"password" binding:"required"`
 }
 
-var identityKey = "id"
+var identityKey = "ID"
 
 func helloHandler(c *gin.Context) {
+	fmt.Println("HELLOHANDLER")
 	claims := jwt.ExtractClaims(c)
 	user, _ := c.Get(identityKey)
 	c.JSON(200, gin.H{
@@ -97,24 +98,29 @@ func main() {
 		MaxRefresh:  time.Hour,
 		IdentityKey: identityKey,
 		PayloadFunc: func(data interface{}) jwt.MapClaims {
+			fmt.Println("PAYLOAD")
 			if v, ok := data.(*User); ok {
+				fmt.Println(data)
 				return jwt.MapClaims{
-					identityKey: v.Username,
+					identityKey: v.ID,
 				}
 			}
 			return jwt.MapClaims{}
 		},
 		IdentityHandler: func(c *gin.Context) interface{} {
+			fmt.Println("IDENTITYHANDLER")
 			claims := jwt.ExtractClaims(c)
+			fmt.Println(claims)
 			return &User{
-				Username: claims[identityKey].(string),
+				ID: uint(claims[identityKey].(float64)),
 			}
 		},
 		Authenticator: func(c *gin.Context) (interface{}, error) {
+			fmt.Println("LOGIN")
 			//questa è una funzione di login, tutta la logica di login va qua dentro
 			//da sostituire "User" con "Login" perche è piu sicuro
 			var loginVals User
-			// var outputUser []User
+			var outputUser User
 			if err := c.ShouldBindJSON(&loginVals); err != nil {
 				return "", jwt.ErrMissingLoginValues
 			}
@@ -122,14 +128,30 @@ func main() {
 			// password := loginVals.Password
 
 			//da aggiungere validazione nel caso la query non trovi l'utente
-			// database.Where(&loginVals).Find(&outputUser)
-			return database.First(&loginVals), nil
+			database.Where(&loginVals).Find(&outputUser).Limit(1)
+			// fmt.Println(outputUser)
+			return &User{
+				Username:  outputUser.Username,
+				LastName:  outputUser.LastName,
+				FirstName: outputUser.FirstName,
+				ID:        outputUser.ID,
+			}, nil
 			// return nil, jwt.ErrFailedAuthentication
 		},
 		Authorizator: func(data interface{}, c *gin.Context) bool {
-			if v, ok := data.(*User); ok && v.Username == "admin" {
+			fmt.Println("AUTHORIZATOR")
+			var loginVals User
+			v := data.(*User)
+			fmt.Println(v, data)
+			//questa funzione deve controllare se l'elemento (l'id o lo username) passato nel token è corretto
+			result := database.Where("ID = ?", v.ID).First(&loginVals)
+			if result.Error == nil {
 				return true
 			}
+			// database.Where(&loginVals).Find(&outputUser).Limit(1)
+			// if v, ok := data.(*User); ok && v.Username == "admin" {
+			// 	return true
+			// }
 
 			return false
 		},
