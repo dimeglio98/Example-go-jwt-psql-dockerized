@@ -1,102 +1,18 @@
 package main
 
 import (
-	"crypto/sha256"
-	"crypto/subtle"
+	"engine/models"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
-	"golang.org/x/crypto/pbkdf2"
-
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
-
-type login struct {
-	Username string `form:"username" json:"username" binding:"required"`
-	Password string `form:"password" json:"password" binding:"required"`
-}
-
-var identityKey = "ID"
-
-func helloHandler(c *gin.Context) {
-	fmt.Println("HELLOHANDLER")
-	claims := jwt.ExtractClaims(c)
-	user, _ := c.Get(identityKey)
-	c.JSON(200, gin.H{
-		"userID":   claims[identityKey],
-		"userName": user.(*User).Username,
-		"text":     "Hello World.",
-	})
-}
-
-var GlobalDB *gorm.DB
-
-func createMessage(c *gin.Context) {
-	fmt.Println("CREATEMESSAGE")
-	var inputMessage Message
-
-	if err := c.ShouldBindJSON(&inputMessage); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	GlobalDB.Create(&inputMessage)
-	c.JSON(http.StatusCreated, inputMessage)
-}
-
-func readMessage(c *gin.Context) {
-	fmt.Println("READMESSAGE")
-
-	var inputMessage Message
-	var outputMessage []Message
-	if err := c.ShouldBindJSON(&inputMessage); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	GlobalDB.Where(&inputMessage).Find(&outputMessage)
-	c.JSON(http.StatusCreated, outputMessage)
-}
-
-// User demo
-type User struct {
-	Username  string
-	FirstName string
-	LastName  string
-	Passwd    string
-	Salt      string
-	ID        uint
-}
-
-type Message struct {
-	Name    string
-	Email   string
-	Object  string
-	Message string
-	ID      uint
-}
-
-func hashPassword(passwd, salt string) string {
-	tempPasswd := pbkdf2.Key([]byte(passwd), []byte(salt), 10000, 50, sha256.New)
-	return fmt.Sprintf("%x", tempPasswd)
-}
-
-// HashPassword hashes a password using PBKDF.
-func (u *User) HashPassword(passwd string) {
-	u.Passwd = hashPassword(passwd, u.Salt)
-}
-
-// ValidatePassword checks if given password matches the one belongs to the user.
-func (u *User) ValidatePassword(passwd string) bool {
-	tempHash := hashPassword(passwd, u.Salt)
-	return subtle.ConstantTimeCompare([]byte(u.Passwd), []byte(tempHash)) == 1
-}
 
 func main() {
 
@@ -108,8 +24,8 @@ func main() {
 		"password=uc4Utauu dbname=test " +
 		"port=5432 sslmode=disable TimeZone=Europe/Rome"
 	database, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	GlobalDB = database
-	database.AutoMigrate(&Message{}, &User{})
+	models.GlobalDB = database
+	database.AutoMigrate(&models.Message{}, &models.User{})
 
 	fmt.Println("Connected to database.")
 
@@ -122,47 +38,46 @@ func main() {
 
 	// the jwt middleware
 	authMiddleware, err := jwt.New(&jwt.GinJWTMiddleware{
-		Realm:       "test zone",
+		Realm:       "example jwt gin psql",
 		Key:         []byte("secret key"),
 		Timeout:     time.Hour,
 		MaxRefresh:  time.Hour,
-		IdentityKey: identityKey,
+		IdentityKey: models.IdentityKey,
 		PayloadFunc: func(data interface{}) jwt.MapClaims {
-			fmt.Println("PAYLOAD")
-			if v, ok := data.(*User); ok {
-				fmt.Println(data)
+			//non so cosa faccia questa funzione, forse aggiunge gli elementi al token
+			fmt.Println("PAYLOADFUNC")
+			if v, ok := data.(models.User); ok {
+				// fmt.Println(data)
 				return jwt.MapClaims{
-					identityKey: v.ID,
+					models.IdentityKey: v.ID,
 				}
 			}
 			return jwt.MapClaims{}
 		},
 		IdentityHandler: func(c *gin.Context) interface{} {
-			//questa funzione penso che restituisca qualcosa nel token, non ho ben capito
+			//questa funzione penso che legga qualcosa dal token, non ho ben capito
 			fmt.Println("IDENTITYHANDLER")
 			claims := jwt.ExtractClaims(c)
 			fmt.Println(claims)
-			return &User{
-				ID: uint(claims[identityKey].(float64)),
+			return &models.User{
+				ID: uint(claims[models.IdentityKey].(float64)),
 			}
 		},
 		Authenticator: func(c *gin.Context) (interface{}, error) {
 			fmt.Println("LOGIN")
 			//questa è una funzione di login, tutta la logica di login va qua dentro
-			//da sostituire "User" con "Login" perche è piu sicuro
-			var loginVals User
-			var outputUser User
+			//da sostituire "models.User" con "Login" perche è piu sicuro
+			var loginVals models.LoginUser
+			var outputUser models.User
 			if err := c.ShouldBindJSON(&loginVals); err != nil {
 				return "", jwt.ErrMissingLoginValues
 			}
 
-			//da aggiungere validazione nel caso la query non trovi l'utente
-			if result := database.Where(&loginVals).First(&outputUser); result.Error != nil {
-				// error handling...
+			if result := database.Table("users").Where(&loginVals).First(&outputUser); result.Error != nil {
 				return nil, jwt.ErrFailedAuthentication
 			}
 
-			return &User{
+			return models.User{
 				Username:  outputUser.Username,
 				LastName:  outputUser.LastName,
 				FirstName: outputUser.FirstName,
@@ -174,10 +89,10 @@ func main() {
 			//questa funzione viene chiamata quando viene fatta una richiesta di una risorsa protetta
 			//deve controllare se l'elemento (l'id o lo username) passato nel token è corretto
 			fmt.Println("AUTHORIZATOR")
-			var loginVals User
-			v := data.(*User) //utente passato nel token?
+			var loginVals models.LoginUser
+			v := data.(*models.User) //utente passato nel token?
 
-			result := database.Where("ID = ?", v.ID).First(&loginVals)
+			result := database.Table("users").Where("ID = ?", v.ID).First(&loginVals)
 			if result.Error == nil {
 				return true
 			}
@@ -232,14 +147,14 @@ func main() {
 
 	auth := r.Group("/auth")
 	// Refresh time can be longer than token timeout
-	auth.GET("/refresh_token", authMiddleware.RefreshHandler)
+	// auth.GET("/refresh_token", authMiddleware.RefreshHandler)
 	auth.Use(authMiddleware.MiddlewareFunc())
 	{
-		auth.GET("/hello", helloHandler)
-		post := auth.Group("/message")
+		// auth.GET("/hello", helloHandler)
+		message := auth.Group("/message")
 		{
-			post.POST("/create", createMessage)
-			post.GET("/read", readMessage)
+			message.POST("/create", models.CreateMessage)
+			message.GET("/read", models.ReadMessage)
 		}
 	}
 
