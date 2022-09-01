@@ -9,6 +9,8 @@ COPY . ./
 # Download all the dependencies
 RUN go get gorm.io/gorm
 RUN go get gorm.io/driver/postgres
+RUN go get golang.org/x/crypto/bcrypt
+
 RUN go get -d -v ./...
 # Install the package
 RUN go install -v ./...

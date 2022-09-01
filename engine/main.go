@@ -10,6 +10,7 @@ import (
 
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -58,7 +59,7 @@ func main() {
 			//questa funzione penso che legga qualcosa dal token, non ho ben capito
 			fmt.Println("IDENTITYHANDLER")
 			claims := jwt.ExtractClaims(c)
-			fmt.Println(claims)
+			// fmt.Println(claims)
 			return &models.User{
 				ID: uint(claims[models.IdentityKey].(float64)),
 			}
@@ -73,6 +74,7 @@ func main() {
 				return "", jwt.ErrMissingLoginValues
 			}
 
+			loginVals.Passwd, _ = bcrypt.GenerateFromPassword([]byte(loginVals.Passwd), bcrypt.DefaultCost)
 			if result := database.Table("users").Where(&loginVals).First(&outputUser); result.Error != nil {
 				return nil, jwt.ErrFailedAuthentication
 			}
@@ -138,6 +140,7 @@ func main() {
 	}
 
 	r.POST("/login", authMiddleware.LoginHandler)
+	r.POST("/signup", models.SignUp)
 
 	r.NoRoute(authMiddleware.MiddlewareFunc(), func(c *gin.Context) {
 		claims := jwt.ExtractClaims(c)
@@ -150,7 +153,7 @@ func main() {
 	// auth.GET("/refresh_token", authMiddleware.RefreshHandler)
 	auth.Use(authMiddleware.MiddlewareFunc())
 	{
-		// auth.GET("/hello", helloHandler)
+		auth.GET("/hello", models.HelloHandler)
 		message := auth.Group("/message")
 		{
 			message.POST("/create", models.CreateMessage)
