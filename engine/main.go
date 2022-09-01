@@ -2,6 +2,7 @@ package main
 
 import (
 	"engine/models"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -68,23 +69,35 @@ func main() {
 			fmt.Println("LOGIN")
 			//questa è una funzione di login, tutta la logica di login va qua dentro
 			//da sostituire "models.User" con "Login" perche è piu sicuro
+
+			/*
+			* ottieni username e pwd in stringa
+			* cerca username nel db, se lo trova restituisce tutto il record
+			* compara l'hash del record con la stringa della pwd
+			* se l'utente è stato trovato e la pwd corrisponde, continua
+			 */
 			var loginVals models.LoginUser
 			var outputUser models.User
+
 			if err := c.ShouldBindJSON(&loginVals); err != nil {
 				return "", jwt.ErrMissingLoginValues
 			}
 
-			loginVals.Passwd, _ = bcrypt.GenerateFromPassword([]byte(loginVals.Passwd), bcrypt.DefaultCost)
-			if result := database.Table("users").Where(&loginVals).First(&outputUser); result.Error != nil {
+			res := models.GlobalDB.Table("users").Where("Username = ?", loginVals.Username).First(&outputUser)
+			if errors.Is(res.Error, gorm.ErrRecordNotFound) {
 				return nil, jwt.ErrFailedAuthentication
+			} else {
+				if bcrypt.CompareHashAndPassword(outputUser.Passwd, []byte(loginVals.Passwd)) == nil {
+					return models.User{
+						// Username:  outputUser.Username,
+						// LastName:  outputUser.LastName,
+						// FirstName: outputUser.FirstName,
+						ID: outputUser.ID,
+					}, nil
+				} else {
+					return nil, jwt.ErrFailedAuthentication
+				}
 			}
-
-			return models.User{
-				Username:  outputUser.Username,
-				LastName:  outputUser.LastName,
-				FirstName: outputUser.FirstName,
-				ID:        outputUser.ID,
-			}, nil
 
 		},
 		Authorizator: func(data interface{}, c *gin.Context) bool {

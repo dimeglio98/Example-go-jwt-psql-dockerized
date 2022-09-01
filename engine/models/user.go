@@ -24,19 +24,35 @@ type LoginUser struct {
 	Passwd   string `form:"passwd" json:"passwd" binding:"required"`
 }
 
+type SignupUser struct {
+	Username  string
+	FirstName string
+	LastName  string
+	Passwd    string
+	ID        uint
+}
+
 func SignUp(c *gin.Context) {
-	var inputUser User
+	var inputUser SignupUser
+	var createUser User
 
 	if err := c.ShouldBindJSON(&inputUser); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	inputUser.Passwd, _ = bcrypt.GenerateFromPassword(inputUser.Passwd, bcrypt.DefaultCost)
-	GlobalDB.Create(&inputUser)
-	c.JSON(http.StatusCreated, inputUser)
+	cryptedPasswd, _ := bcrypt.GenerateFromPassword([]byte(inputUser.Passwd), bcrypt.DefaultCost)
+
+	createUser.FirstName = inputUser.FirstName
+	createUser.LastName = inputUser.LastName
+	createUser.Username = inputUser.Username
+	createUser.Passwd = cryptedPasswd
+
+	GlobalDB.Create(&createUser)
+	c.JSON(http.StatusCreated, createUser)
 }
 
+// test function
 func HelloHandler(c *gin.Context) {
 	fmt.Println("HELLOHANDLER")
 
