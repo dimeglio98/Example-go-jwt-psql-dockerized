@@ -15,23 +15,11 @@ services:
     container_name: TESTGODB
     image: postgres
     environment:
-      POSTGRES_PASSWORD: uc4Utauu
-      POSTGRES_USER: test
-      POSTGRES_DB: test
+      - POSTGRES_PASSWORD=dncvgua5r3
+      - POSTGRES_USER=test
+      - POSTGRES_DB=test
     ports:
       - 5432:5432
     volumes:
-      - ./data/pgdata:/var/lib/postgresql/data 
-  # db:
-  #   image: mongo
-  #   container_name: FantaSW_mongodb
-  #   environment:
-  #     PUID: 1000
-  #     PGID: 1000
-  #     MONGO_INITDB_DATABASE: garadb
-  #   volumes:
-  #     - ./data/mongodata:/data/db
-  #   ports:
-  #     - 27017:27017
-  #   restart: unless-stopped      
+      - ./data/pgdata:/var/lib/postgresql/data     
     

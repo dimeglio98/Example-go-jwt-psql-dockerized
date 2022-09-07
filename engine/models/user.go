@@ -1,7 +1,6 @@
 package models
 
 import (
-	"fmt"
 	"net/http"
 
 	jwt "github.com/appleboy/gin-jwt/v2"
@@ -41,6 +40,7 @@ func SignUp(c *gin.Context) {
 		return
 	}
 
+	//Bcrypt to mask password in db
 	cryptedPasswd, _ := bcrypt.GenerateFromPassword([]byte(inputUser.Passwd), bcrypt.DefaultCost)
 
 	createUser.FirstName = inputUser.FirstName
@@ -54,23 +54,14 @@ func SignUp(c *gin.Context) {
 
 // test function
 func HelloHandler(c *gin.Context) {
-	fmt.Println("HELLOHANDLER")
-
 	var outputUser User
 	claims := jwt.ExtractClaims(c)
-	// user, _ := c.Get(IdentityKey)
-	// fmt.Println("CLAIMS: ", claims)
-	// fmt.Println("USER: ", user)
 
 	GlobalDB.Where("ID = ?", claims[IdentityKey]).First(&outputUser)
-	hash, _ := bcrypt.GenerateFromPassword([]byte(outputUser.Passwd), bcrypt.DefaultCost)
-	compare := bcrypt.CompareHashAndPassword(hash, []byte(outputUser.Passwd))
 
 	c.JSON(200, gin.H{
 		"userID":   claims[IdentityKey],
 		"userName": outputUser.Username,
 		"text":     "Hello World.",
-		"Hash":     hash,
-		"Result":   compare,
 	})
 }

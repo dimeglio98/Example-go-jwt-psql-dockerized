@@ -1,7 +1,6 @@
 package models
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -19,7 +18,6 @@ type Message struct {
 var GlobalDB *gorm.DB
 
 func CreateMessage(c *gin.Context) {
-	fmt.Println("CREATEMESSAGE")
 	var inputMessage Message
 
 	if err := c.ShouldBindJSON(&inputMessage); err != nil {
@@ -32,10 +30,9 @@ func CreateMessage(c *gin.Context) {
 }
 
 func ReadMessage(c *gin.Context) {
-	fmt.Println("READMESSAGE")
-
 	var inputMessage Message
 	var outputMessage []Message
+
 	if err := c.ShouldBindJSON(&inputMessage); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
